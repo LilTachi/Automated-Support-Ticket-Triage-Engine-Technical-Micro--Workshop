@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support ticket triage</title>
+<style>
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#17212b; --muted:#566371; --line:#d5dbe2;
+  --cat:#0f6b6b; --Low:#2e7d4f; --Medium:#a8690a; --High:#c0392b;
+  --ok:#e4f2ea; --warn:#fcefd6; --focus:#1a5fd0; --btn:#17212b; --btn-ink:#ffffff;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#12171c; --panel:#1b222a; --ink:#e8edf2; --muted:#9aa7b4; --line:#2e3944;
+    --cat:#55b9b9; --Low:#5cc58a; --Medium:#e0a443; --High:#ef7b6d;
+    --ok:#173022; --warn:#352a10; --focus:#7fb0ff; --btn:#e8edf2; --btn-ink:#12171c;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--sans)}
+main{max-width:880px;margin:0 auto;padding:32px 20px 64px}
+h1{font:600 30px/1.15 var(--serif);margin:0 0 6px;letter-spacing:-.01em}
+.sub{margin:0;color:var(--muted);max-width:60ch}
+#status{margin:10px 0 0;font-size:14px;color:var(--muted)}
+.tabs{display:flex;gap:4px;margin:26px 0 0;border-bottom:1px solid var(--line)}
+.tab{font:inherit;font-weight:600;background:none;border:0;color:var(--muted);padding:10px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--cat)}
+section{padding-top:22px}
+label{display:block;font-weight:600;margin-bottom:6px}
+textarea{width:100%;font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;resize:vertical;min-height:96px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px}
+.hint{color:var(--muted);font-size:14px}
+button{font:inherit}
+.primary{background:var(--btn);color:var(--btn-ink);border:0;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer}
+.primary:disabled{opacity:.55;cursor:progress}
+.ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:9px 14px;cursor:pointer}
+.link{background:none;border:0;padding:0;color:var(--cat);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.examples{margin-top:12px;font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.error{margin-top:18px;padding:12px 14px;border-left:4px solid var(--High);background:var(--warn);border-radius:0 8px 8px 0}
+
+/* single result */
+.stub{margin-top:24px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.verdict{padding:14px 18px;border-left:6px solid var(--Low);background:var(--ok);display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline}
+.verdict.warn{border-left-color:var(--Medium);background:var(--warn)}
+.verdict strong{font:600 18px var(--serif)}
+.verdict span{color:var(--muted);font-size:14px}
+.head{padding:20px 18px 18px;border-top:1px solid var(--line)}
+.head:first-of-type{border-top:0}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.kind{color:var(--muted);font-size:14px}
+.big{font:600 34px/1.1 var(--serif);margin:2px 0 0}
+.conf{font-weight:600;white-space:nowrap}
+.conf small{font-weight:400;color:var(--muted)}
+.bar{display:flex;height:12px;margin-top:12px;border-radius:3px;overflow:hidden;background:var(--line)}
+.seg{height:100%;width:0;transition:width .45s ease-out;background:currentColor}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:14px;color:var(--muted)}
+.legend b{color:var(--ink);font-weight:600}
+.meta{margin:0;padding:12px 18px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--muted);font-size:14px}
+pre{margin:8px 0 0;padding:12px;background:var(--bg);border-radius:8px;overflow:auto;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.stub details{padding:0 18px 16px;margin:0}
+
+/* batch */
+.summary{margin:22px 0 10px;font-weight:600}
+.scroll{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th{text-align:left;font-size:14px;color:var(--muted);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.num{color:var(--muted);width:36px}
+td.txt{max-width:300px;overflow-wrap:anywhere}
+.cell b{display:block;font-family:var(--serif);font-size:17px}
+.cell .mini{display:block;height:6px;border-radius:3px;background:var(--line);margin-top:5px;max-width:120px;overflow:hidden}
+.cell .mini i{display:block;height:100%;background:currentColor;width:0;transition:width .45s ease-out}
+.cell span.p{font-size:13px;color:var(--muted)}
+.flag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:13px;font-weight:600;background:var(--ok)}
+.flag.warn{background:var(--warn)}
+.tick{border-left:5px solid var(--Low)}
+@media (prefers-reduced-motion:reduce){.seg,.cell .mini i{transition:none}}
+@media (max-width:560px){h1{font-size:25px}.big{font-size:28px}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Support ticket triage</h1>
+    <p class="sub">Paste a customer message to see its category, how urgent it is, and whether a person should check it before it is routed.</p>
+    <p id="status">Connecting to the model…</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Mode">
+    <button class="tab" role="tab" id="tab-one" aria-selected="true" aria-controls="panel-one">One ticket</button>
+    <button class="tab" role="tab" id="tab-many" aria-selected="false" aria-controls="panel-many">Many tickets</button>
+  </div>
+
+  <section id="panel-one" role="tabpanel" aria-labelledby="tab-one">
+    <label for="ticket">Ticket text</label>
+    <textarea id="ticket" maxlength="5000" placeholder="For example: I was charged twice and my payment bounced, URGENT!"></textarea>
+    <div class="row">
+      <button class="primary" id="go-one">Analyze ticket</button>
+      <span class="hint">Or press Ctrl+Enter</span>
+    </div>
+    <div class="examples">
+      <span>Try an example:</span>
+      <button class="link" data-text="The whole platform is down for our entire team, URGENT!">Outage</button>
+      <button class="link" data-text="How do I change my display name? No rush.">Profile question</button>
+      <button class="link" data-text="My refund has not arrived and the app also crashes.">Two issues in one</button>
+      <button class="link" data-text="What is the best pizza in town?">Off-topic</button>
+    </div>
+    <div id="result-one" aria-live="polite"></div>
+  </section>
+
+  <section id="panel-many" role="tabpanel" aria-labelledby="tab-many" hidden>
+    <label for="tickets">Tickets, one per line (up to 64)</label>
+    <textarea id="tickets" rows="8" placeholder="Paste one ticket per line"></textarea>
+    <div class="row">
+      <button class="primary" id="go-many">Analyze all tickets</button>
+      <button class="ghost" id="load-examples">Load examples</button>
+      <button class="ghost" id="download" hidden>Download CSV</button>
+    </div>
+    <div id="result-many" aria-live="polite"></div>
+  </section>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var EXAMPLES = [
+    "The whole platform is down for our entire team, URGENT!",
+    "I was charged twice and my account is now overdrawn. ASAP",
+    "How do I change my display name? no rush",
+    "My password reset email never arrives, this is getting frustrating",
+    "Do you offer student discounts",
+    "Someone else is logging into my account right now!!",
+    "File uploads keep failing for large documents",
+    "What is the best pizza in town?"
+  ];
+  var REASONS = {
+    low_confidence: "The model is not sure which label fits.",
+    unfamiliar_text: "The wording is unlike the tickets the model was trained on."
+  };
+  var lastRows = null;
+
+  function $(id){ return document.getElementById(id); }
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function pct(x){ return x >= 0.995 ? "100%" : x < 0.005 ? "<1%" : Math.round(x * 100) + "%"; }
+  function colorFor(kind, label){ return kind === "urgency" ? "var(--" + label + ")" : "var(--cat)"; }
+
+  function post(url, body){
+    return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
+      .then(function(r){
+        return r.json().catch(function(){ return null; }).then(function(data){
+          if (!r.ok) {
+            var e = new Error(r.status === 422
+              ? "The API rejected this input. Each ticket must be 1 to 5,000 characters and not blank."
+              : "The API returned an error (" + r.status + ").");
+            throw e;
+          }
+          return data;
+        });
+      }, function(){ throw new Error("Cannot reach the API. Check that the uvicorn server is still running."); });
+  }
+
+  function showError(box, msg){ box.textContent = ""; box.appendChild(el("p", "error", msg)); }
+
+  /* ---------- probability bar (stacked, sorted high to low) ---------- */
+  function probBar(kind, head){
+    var items = Object.keys(head.probabilities).map(function(k){ return [k, head.probabilities[k]]; })
+      .sort(function(a, b){ return b[1] - a[1]; });
+    var wrap = el("div");
+    var bar = el("div", "bar");
+    bar.style.color = colorFor(kind, head.label);
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", items.map(function(i){ return i[0] + " " + pct(i[1]); }).join(", "));
+    items.forEach(function(it, idx){
+      var s = el("div", "seg");
+      s.title = it[0] + ": " + pct(it[1]);
+      s.style.opacity = String([1, 0.5, 0.3, 0.18][idx] || 0.18);
+      s.dataset.w = (it[1] * 100).toFixed(2) + "%";
+      bar.appendChild(s);
+    });
+    var legend = el("div", "legend");
+    items.forEach(function(it){
+      var s = el("span"); s.appendChild(el("b", "", it[0])); s.appendChild(document.createTextNode(" " + pct(it[1])));
+      legend.appendChild(s);
+    });
+    wrap.appendChild(bar); wrap.appendChild(legend);
+    return wrap;
+  }
+  function grow(root){
+    requestAnimationFrame(function(){
+      root.querySelectorAll(".seg").forEach(function(s){ s.style.width = s.dataset.w; });
+      root.querySelectorAll(".mini i").forEach(function(s){ s.style.width = s.dataset.w; });
+    });
+  }
+
+  function headBlock(kind, title, head){
+    var h = el("div", "head");
+    var top = el("div", "top");
+    var left = el("div");
+    left.appendChild(el("div", "kind", title));
+    var big = el("div", "big", head.label);
+    big.style.color = colorFor(kind, head.label);
+    left.appendChild(big);
+    var conf = el("div", "conf", pct(head.confidence) + " ");
+    conf.appendChild(el("small", "", "sure"));
+    top.appendChild(left); top.appendChild(conf);
+    h.appendChild(top); h.appendChild(probBar(kind, head));
+    return h;
+  }
+
+  function verdict(r){
+    var v = el("div", "verdict" + (r.needs_human_review ? " warn" : ""));
+    if (r.needs_human_review) {
+      v.appendChild(el("strong", "", "Send to a person"));
+      v.appendChild(el("span", "", (r.review_reasons || []).map(function(x){ return REASONS[x] || x; }).join(" ")));
+    } else {
+      v.appendChild(el("strong", "", "Safe to route automatically"));
+      v.appendChild(el("span", "", "Both predictions are confident and the wording looks familiar."));
+    }
+    return v;
+  }
+
+  function rawBlock(data){
+    var d = el("details"); d.appendChild(el("summary", "", "Show raw API response"));
+    d.appendChild(el("pre", "", JSON.stringify(data, null, 2)));
+    return d;
+  }
+
+  /* ---------- one ticket ---------- */
+  function analyzeOne(){
+    var box = $("result-one"), text = $("ticket").value;
+    if (!text.trim()) { showError(box, "Enter some ticket text first."); return; }
+    $("go-one").disabled = true;
+    post("/predict", {text: text}).then(function(r){
+      box.textContent = "";
+      var stub = el("article", "stub");
+      stub.appendChild(verdict(r));
+      stub.appendChild(headBlock("category", "Category", r.category));
+      stub.appendChild(headBlock("urgency", "Urgency", r.urgency));
+      stub.appendChild(el("p", "meta", "Answered by the " + r.model + " model in " + r.latency_ms + " ms."));
+      stub.appendChild(rawBlock(r));
+      box.appendChild(stub); grow(box);
+    }).catch(function(e){ showError(box, e.message); })
+      .then(function(){ $("go-one").disabled = false; });
+  }
+
+  /* ---------- many tickets ---------- */
+  function cell(kind, head){
+    var td = el("td", "cell");
+    td.style.color = "";
+    var b = el("b", "", head.label); b.style.color = colorFor(kind, head.label);
+    var mini = el("span", "mini"); mini.style.color = colorFor(kind, head.label);
+    var i = el("i"); i.dataset.w = (head.confidence * 100).toFixed(1) + "%"; mini.appendChild(i);
+    td.appendChild(b); td.appendChild(mini); td.appendChild(el("span", "p", pct(head.confidence) + " sure"));
+    return td;
+  }
+
+  function analyzeMany(){
+    var box = $("result-many");
+    var lines = $("tickets").value.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+    $("download").hidden = true;
+    if (!lines.length) { showError(box, "Enter at least one ticket, one per line."); return; }
+    if (lines.length > 64) { showError(box, "You entered " + lines.length + " tickets. The limit is 64 per request."); return; }
+    $("go-many").disabled = true;
+    post("/predict/batch", {texts: lines}).then(function(res){
+      lastRows = lines.map(function(t, i){ return {text: t, r: res[i]}; });
+      var review = res.filter(function(r){ return r.needs_human_review; }).length;
+      box.textContent = "";
+      box.appendChild(el("p", "summary", res.length + (res.length === 1 ? " ticket" : " tickets") + " analyzed, " +
+        (review === 0 ? "none need a person." : review + (review === 1 ? " needs a person." : " need a person."))));
+      var wrap = el("div", "scroll"), table = el("table");
+      var thead = el("thead"), hr = el("tr");
+      ["#", "Ticket", "Category", "Urgency", "Routing"].forEach(function(h){ hr.appendChild(el("th", "", h)); });
+      thead.appendChild(hr); table.appendChild(thead);
+      var tb = el("tbody");
+      lastRows.forEach(function(row, i){
+        var r = row.r, tr = el("tr");
+        tr.appendChild(el("td", "num tick", String(i + 1)));
+        tr.firstChild.style.borderLeftColor = colorFor("urgency", r.urgency.label);
+        var t = el("td", "txt", row.text); t.title = row.text; tr.appendChild(t);
+        tr.appendChild(cell("category", r.category));
+        tr.appendChild(cell("urgency", r.urgency));
+        var f = el("td"); var fl = el("span", "flag" + (r.needs_human_review ? " warn" : ""), r.needs_human_review ? "Send to a person" : "Auto-route");
+        if (r.needs_human_review) fl.title = (r.review_reasons || []).map(function(x){ return REASONS[x] || x; }).join(" ");
+        f.appendChild(fl); tr.appendChild(f);
+        tb.appendChild(tr);
+      });
+      table.appendChild(tb); wrap.appendChild(table); box.appendChild(wrap);
+      box.appendChild(rawBlock(res));
+      $("download").hidden = false; grow(box);
+    }).catch(function(e){ showError(box, e.message); })
+      .then(function(){ $("go-many").disabled = false; });
+  }
+
+  function csvCell(v){ v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function downloadCsv(){
+    if (!lastRows) return;
+    var head = ["text", "category", "category_confidence", "urgency", "urgency_confidence", "needs_human_review", "review_reasons"];
+    var out = [head.join(",")].concat(lastRows.map(function(x){
+      var r = x.r;
+      return [x.text, r.category.label, r.category.confidence, r.urgency.label, r.urgency.confidence,
+              r.needs_human_review, (r.review_reasons || []).join(";")].map(csvCell).join(",");
+    }));
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([out.join("\n")], {type: "text/csv"}));
+    a.download = "triage_results.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  /* ---------- wiring ---------- */
+  function selectTab(which){
+    var one = which === "one";
+    $("tab-one").setAttribute("aria-selected", String(one));
+    $("tab-many").setAttribute("aria-selected", String(!one));
+    $("panel-one").hidden = !one; $("panel-many").hidden = one;
+  }
+  $("tab-one").addEventListener("click", function(){ selectTab("one"); });
+  $("tab-many").addEventListener("click", function(){ selectTab("many"); });
+  $("go-one").addEventListener("click", analyzeOne);
+  $("go-many").addEventListener("click", analyzeMany);
+  $("download").addEventListener("click", downloadCsv);
+  $("load-examples").addEventListener("click", function(){ $("tickets").value = EXAMPLES.join("\n"); });
+  $("ticket").addEventListener("keydown", function(e){ if ((e.ctrlKey || e.metaKey) && e.key === "Enter") analyzeOne(); });
+  $("tickets").addEventListener("keydown", function(e){ if ((e.ctrlKey || e.metaKey) && e.key === "Enter") analyzeMany(); });
+  document.querySelectorAll(".examples .link").forEach(function(b){
+    b.addEventListener("click", function(){ $("ticket").value = b.dataset.text; analyzeOne(); });
+  });
+
+  fetch("/health").then(function(r){ return r.json(); }).then(function(h){
+    $("status").textContent = "Ready. Using the " + h.model + " model, version " + h.version + ".";
+  }).catch(function(){ $("status").textContent = "Cannot reach the API. Check that the uvicorn server is running."; });
+})();
+</script>
+</body>
+</html>
