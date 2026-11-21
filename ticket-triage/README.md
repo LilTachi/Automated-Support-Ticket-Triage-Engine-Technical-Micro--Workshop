@@ -56,11 +56,6 @@ pip install -r requirements.txt
 ```
 If PowerShell blocks the activation script, run `Set-ExecutionPolicy -Scope Process Bypass` and try again.
 
-**macOS / Linux:**
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
 ```
 
 ### 3. Verify the installation
@@ -89,7 +84,6 @@ Interactive Swagger docs are at **http://localhost:8000/docs**: click `POST /pre
 
 | System | Command |
 |---|---|
-| macOS / Linux | `curl -X POST localhost:8000/predict -H "Content-Type: application/json" -d '{"text": "My password reset email never arrives"}'` |
 | Windows PowerShell | `Invoke-RestMethod -Method Post -Uri http://localhost:8000/predict -ContentType "application/json" -Body '{"text": "My password reset email never arrives"}'` |
 
 > Opening `/predict` in a browser address bar shows **"Method Not Allowed"**. That is expected: the endpoint only accepts **POST**. Use the page at `/`, `/docs`, or one of the commands above.
@@ -215,7 +209,6 @@ ticket-triage/
 | `TRIAGE_ARTIFACTS` | `artifacts/` | Folder to load models from |
 
 Example (Windows PowerShell): `$env:TRIAGE_MODEL="baseline"; uvicorn triage.api:app --port 8000`
-Example (macOS / Linux): `TRIAGE_MODEL=baseline uvicorn triage.api:app --port 8000`
 
 ## Troubleshooting
 
@@ -235,5 +228,4 @@ Example (macOS / Linux): `TRIAGE_MODEL=baseline uvicorn triage.api:app --port 80
 - **Synthetic data.** Scores demonstrate that the pipeline works, not how it would perform on real customer tickets, which are longer, multi-topic and inconsistently labelled. One split and one seed: a point or two between models is within noise.
 - **Urgency leans on cue words** such as "URGENT" and "no rush". A ticket like "charged twice, no rush" is labelled Low. Real deployments need a severity policy agreed with the support team.
 - **Word-level vocabulary.** Unseen words and typos become unknown tokens. A pretrained sub-word model such as DistilBERT is the natural next step on real data; it is not implemented here.
-- **No drift monitoring yet.** The intended first signals are the share of `unfamiliar_text` flags and the confidence distribution over time.
 - **Optional public data.** The Kaggle "Customer Support Ticket Dataset" can be loaded with `python -m triage.train --data customer_support_tickets.csv --artifacts artifacts_kaggle`. The training script prints a signal check against shuffled labels; on that dataset it warns that the labels look unrelated to the text, which is why this project uses the synthetic dataset.
